@@ -3,7 +3,6 @@ package org.apache.catalina.core;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
@@ -11,16 +10,13 @@ import org.apache.tomcat.util.http.fileupload.IOUtils;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletResponse;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
 public class TomcatGlobalAuthenticationValve extends ValveBase {
-    public static final String SESSION_ATTRIBUTE_KEY = "authenticationed";
+    public static final String SESSION_ATTRIBUTE_KEY = "authentication";
     private static final String SESSION_ATTRIBUTE_VALUE = "true";
     private static final String TOMCAT_LOGIN_PATH = "tomcat/tomcat-index.html";
     private static final String TOMCAT_API_PREFIX = "/tomcat/api";
@@ -40,22 +36,31 @@ public class TomcatGlobalAuthenticationValve extends ValveBase {
 
     @Override
     public void invoke(Request request, Response response) throws IOException, ServletException {
+        //如果已经认证了
         if (SESSION_ATTRIBUTE_VALUE.equals(request.getSession().getAttribute(SESSION_ATTRIBUTE_KEY))) {
+            if (request.getRequestURI().startsWith("/desktop/api/system/resetLogoPasswd")) {
+                request.clearCookies();
+                request.getSession().removeAttribute(SESSION_ATTRIBUTE_KEY);
+            }
             getNext().invoke(request, response);
             return;
         }
+        //没认证
         setHttpResponseDefaultConfig(response);
         log.info(sm.getString("global.authentication.noauth"));
+        //处理接口
         if (request.getRequestURI().startsWith(TOMCAT_API_PREFIX)) {
             doHandlerTomcatApi(request, response);
             return;
         }
 
         InputStream indexPageResource = getIndexPageResource();
+        //没有找到index.html
         if (indexPageResource == null) {
             replyDefaultPage(response);
             return;
         }
+        //返回登录页面
         replyTomcatLoginPage(indexPageResource, response);
     }
 
@@ -73,6 +78,9 @@ public class TomcatGlobalAuthenticationValve extends ValveBase {
     private void setHttpResponseDefaultConfig(Response response) {
         HttpServletResponse httpServletResponse = response.getResponse();
         httpServletResponse.setContentType("text/html; charset=utf-8");
+        httpServletResponse.addHeader("Cache-Control", "no-cache");
+        httpServletResponse.addHeader("Pragma", "no-cache");
+        httpServletResponse.addHeader("Expires", "0");
 
     }
 
@@ -81,7 +89,9 @@ public class TomcatGlobalAuthenticationValve extends ValveBase {
             HttpServletResponse httpServletResponse = response.getResponse();
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             IOUtils.copy(inputStream, outputStream);
-            httpServletResponse.getOutputStream().write(outputStream.toByteArray());
+            String htmlBody = new String(outputStream.toByteArray());
+            String newHtml = htmlBody.replace("${rsapublic}", TomcatGlobalAuthenticationUtils.getPublicKey());
+            httpServletResponse.getOutputStream().write(newHtml.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             e.printStackTrace();
         }
