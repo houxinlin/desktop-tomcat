@@ -4,18 +4,81 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import java.io.File;
+import java.io.IOException;
+import java.net.JarURLConnection;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.Base64;
+import java.util.jar.JarFile;
 
 public class TomcatGlobalAuthenticationUtils {
     private static PrivateKey privateKey;
     private static PublicKey publicKey;
 
+    static class ApplicationHome {
+        private boolean isUnitTest() {
+            try {
+                StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+                for (int i = stackTrace.length - 1; i >= 0; --i) {
+                    if (stackTrace[i].getClassName().startsWith("org.junit.")) {
+                        return true;
+                    }
+                }
+            } catch (Exception var3) {
+            }
+
+            return false;
+        }
+
+        private File findSource(URL location) throws IOException, URISyntaxException {
+            URLConnection connection = location.openConnection();
+            return connection instanceof JarURLConnection ? this.getRootJarFile(((JarURLConnection) connection).getJarFile()) : new File(location.toURI());
+        }
+
+        private File getRootJarFile(JarFile jarFile) {
+            String name = jarFile.getName();
+            int separator = name.indexOf("!/");
+            if (separator > 0) {
+                name = name.substring(0, separator);
+            }
+
+            return new File(name);
+        }
+
+        public File findHomeDir() {
+            File source = findSource(TomcatGlobalAuthenticationUtils.class);
+            File homeDir = source != null ? source : null;
+            if (homeDir.isFile()) {
+                homeDir = homeDir.getParentFile();
+            }
+
+            homeDir = homeDir.exists() ? homeDir : new File(".");
+            return homeDir.getAbsoluteFile();
+        }
+
+        private File findSource(Class<?> sourceClass) {
+            try {
+                ProtectionDomain domain = sourceClass != null ? sourceClass.getProtectionDomain() : null;
+                CodeSource codeSource = domain != null ? domain.getCodeSource() : null;
+                URL location = codeSource != null ? codeSource.getLocation() : null;
+                File source = location != null ? this.findSource(location) : null;
+                if (source != null && source.exists() && !this.isUnitTest()) {
+                    return source.getAbsoluteFile();
+                }
+            } catch (Exception var6) {
+            }
+
+            return null;
+        }
+    }
+
     static {
         generator();
     }
-
 
 
     private static void generator() {

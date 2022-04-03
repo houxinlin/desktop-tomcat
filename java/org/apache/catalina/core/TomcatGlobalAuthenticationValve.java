@@ -7,20 +7,27 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
 import org.apache.tomcat.util.http.fileupload.IOUtils;
+import sun.misc.ClassLoaderUtil;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletResponse;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.List;
 
 public class TomcatGlobalAuthenticationValve extends ValveBase {
     public static final String SESSION_ATTRIBUTE_KEY = "authentication";
     private static final String SESSION_ATTRIBUTE_VALUE = "true";
     private static final String TOMCAT_LOGIN_PATH = "tomcat/tomcat-index.html";
     private static final String TOMCAT_API_PREFIX = "/tomcat/api";
-    private Log log = LogFactory.getLog(TomcatGlobalAuthenticationValve.class);
+    private static final String OPEN_FILE = "work/config/o_urls/config";
+    private static Log log = LogFactory.getLog(TomcatGlobalAuthenticationValve.class);
 
     private TomcatGlobalAuthenticationHttpServlet tomcatGlobalAuthenticationHttpServlet;
 
@@ -37,6 +44,10 @@ public class TomcatGlobalAuthenticationValve extends ValveBase {
     @Override
     public void invoke(Request request, Response response) throws IOException, ServletException {
         //如果已经认证了
+        if (isOpenUrl(request.getRequestURI())) {
+            getNext().invoke(request, response);
+            return;
+        }
         if (SESSION_ATTRIBUTE_VALUE.equals(request.getSession().getAttribute(SESSION_ATTRIBUTE_KEY))) {
             if (request.getRequestURI().startsWith("/desktop/api/system/resetLogoPasswd")) {
                 request.clearCookies();
@@ -62,6 +73,30 @@ public class TomcatGlobalAuthenticationValve extends ValveBase {
         }
         //返回登录页面
         replyTomcatLoginPage(indexPageResource, response);
+    }
+
+    private static boolean isOpenUrl(String requestUrl) {
+        URI requestURI = URI.create(requestUrl);
+
+        TomcatGlobalAuthenticationUtils.ApplicationHome applicationHome = new TomcatGlobalAuthenticationUtils.ApplicationHome();
+        File source = applicationHome.findHomeDir();
+        File openFile = new File(source, OPEN_FILE);
+        if (!openFile.exists()) {
+            log.info(openFile + " not exist");
+            return false;
+        }
+        try {
+            List<String> strings = Files.readAllLines(Paths.get(openFile.getAbsolutePath()));
+            for (String item : strings) {
+                if (requestURI.getPath().equals(item)){
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
+
     }
 
     private void doHandlerTomcatApi(Request request, Response response) {
