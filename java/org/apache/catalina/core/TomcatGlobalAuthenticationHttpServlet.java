@@ -9,8 +9,10 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.Part;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
 public class TomcatGlobalAuthenticationHttpServlet extends HttpServlet {
@@ -20,6 +22,7 @@ public class TomcatGlobalAuthenticationHttpServlet extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        Collection<Part> parts = req.getParts();
         if (TOMCAT_API_LOGIN.equals(req.getRequestURI())) {
             //获取密码
             try {

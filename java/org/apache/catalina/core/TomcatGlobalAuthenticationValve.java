@@ -11,6 +11,7 @@ import sun.misc.ClassLoaderUtil;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.Part;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,11 +44,12 @@ public class TomcatGlobalAuthenticationValve extends ValveBase {
 
     @Override
     public void invoke(Request request, Response response) throws IOException, ServletException {
-        //如果已经认证了
+
         if (isOpenUrl(request.getRequestURI())) {
             getNext().invoke(request, response);
             return;
         }
+        //如果已经认证了
         if (SESSION_ATTRIBUTE_VALUE.equals(request.getSession().getAttribute(SESSION_ATTRIBUTE_KEY))) {
             if (request.getRequestURI().startsWith("/desktop/api/system/resetLogoPasswd")) {
                 request.clearCookies();
@@ -75,6 +77,11 @@ public class TomcatGlobalAuthenticationValve extends ValveBase {
         replyTomcatLoginPage(indexPageResource, response);
     }
 
+    /**
+     * 是否开放URL
+     * @param requestUrl
+     * @return
+     */
     private static boolean isOpenUrl(String requestUrl) {
         URI requestURI = URI.create(requestUrl);
 
