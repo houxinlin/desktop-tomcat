@@ -26,7 +26,7 @@ public class TomcatGlobalAuthenticationValve extends ValveBase {
     private static final String TOMCAT_LOGIN_PATH = "tomcat/tomcat-index.html";
     private static final String TOMCAT_API_PREFIX = "/tomcat/api";
     private static final String OPEN_FILE = "work/config/o_urls/config";
-    private static Log log = LogFactory.getLog(TomcatGlobalAuthenticationValve.class);
+    private static final Log log = LogFactory.getLog(TomcatGlobalAuthenticationValve.class);
 
     private TomcatGlobalAuthenticationHttpServlet tomcatGlobalAuthenticationHttpServlet;
 
@@ -42,29 +42,34 @@ public class TomcatGlobalAuthenticationValve extends ValveBase {
 
     @Override
     public void invoke(Request request, Response response) throws IOException, ServletException {
-
+        response.setCharacterEncoding("UTF-8");
+        //如果是开放url
         if (isOpenUrl(request.getRequestURI())) {
             getNext().invoke(request, response);
             return;
         }
         //如果已经认证了
         if (SESSION_ATTRIBUTE_VALUE.equals(request.getSession().getAttribute(SESSION_ATTRIBUTE_KEY))) {
-            if (request.getRequestURI().startsWith("/desktop/api/system/resetLogoPasswd")) {
+            //如果是重置密码请求，则将cookie删除
+            if (request.getRequestURI().startsWith("/desktop/api/system/resetLoginPasswd")) {
                 request.clearCookies();
                 request.getSession().removeAttribute(SESSION_ATTRIBUTE_KEY);
+            }
+            if (TomcatGlobalAuthenticationHttpServlet.TOMCAT_URL_LOGOUT.equals(request.getRequestURI())) {
+                request.getSession().removeAttribute(TomcatGlobalAuthenticationValve.SESSION_ATTRIBUTE_KEY);
+                response.sendRedirect("/");
+                return;
             }
             getNext().invoke(request, response);
             return;
         }
-        //没认证
-        setHttpResponseDefaultConfig(response);
-        log.info(sm.getString("global.authentication.noauth"));
         //处理接口
         if (request.getRequestURI().startsWith(TOMCAT_API_PREFIX)) {
             doHandlerTomcatApi(request, response);
             return;
         }
-
+        //没认证
+        setHttpResponseDefaultConfig(response);
         InputStream indexPageResource = getIndexPageResource();
         //没有找到index.html
         if (indexPageResource == null) {
@@ -77,6 +82,7 @@ public class TomcatGlobalAuthenticationValve extends ValveBase {
 
     /**
      * 是否开放URL
+     *
      * @param requestUrl
      * @return
      */
@@ -87,13 +93,12 @@ public class TomcatGlobalAuthenticationValve extends ValveBase {
         File source = applicationHome.findHomeDir();
         File openFile = new File(source, OPEN_FILE);
         if (!openFile.exists()) {
-            log.info(openFile + " not exist");
             return false;
         }
         try {
             List<String> strings = Files.readAllLines(Paths.get(openFile.getAbsolutePath()));
             for (String item : strings) {
-                if (requestURI.getPath().equals(item)){
+                if (requestURI.getPath().equals(item)) {
                     return true;
                 }
             }
@@ -119,8 +124,6 @@ public class TomcatGlobalAuthenticationValve extends ValveBase {
         HttpServletResponse httpServletResponse = response.getResponse();
         httpServletResponse.setContentType("text/html; charset=utf-8");
         httpServletResponse.addHeader("Cache-Control", "no-cache");
-        httpServletResponse.addHeader("Pragma", "no-cache");
-        httpServletResponse.addHeader("Expires", "0");
 
     }
 

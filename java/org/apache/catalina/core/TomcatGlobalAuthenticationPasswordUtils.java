@@ -1,6 +1,5 @@
 package org.apache.catalina.core;
 
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
@@ -11,14 +10,14 @@ import java.nio.file.Paths;
 
 public class TomcatGlobalAuthenticationPasswordUtils {
     private static Log log = LogFactory.getLog(TomcatGlobalAuthenticationPasswordUtils.class);
-    private static final String PASSWORD_PATH = System.getProperty("user.home") + "/desktop-tomcat";
-    private static final String PASSWORD_FILE_NAME = "password";
-
+    private static final String PASSWORD_PATH = System.getProperty("user.home") + "/cooldesktop-work/";
+    private static final String PASSWORD_FILE_NAME = "password.conf";
+    private static final String DEFAULT_PASSWORD="CE3DEB59B9EE91C3067FDFF1E458B7F0";
     public static void createIfNotExist() {
         try {
             if (!Files.exists(Paths.get(PASSWORD_PATH, PASSWORD_FILE_NAME))) {
                 Files.createDirectories(Paths.get(PASSWORD_PATH));
-                Files.write(Paths.get(PASSWORD_PATH, PASSWORD_FILE_NAME), getRandomPassword().getBytes(StandardCharsets.UTF_8));
+                Files.write(Paths.get(PASSWORD_PATH, PASSWORD_FILE_NAME), DEFAULT_PASSWORD.getBytes(StandardCharsets.UTF_8));
             }
         } catch (IOException e) {
             log.info("无法创建密码文件" + e.getMessage());
@@ -36,8 +35,4 @@ public class TomcatGlobalAuthenticationPasswordUtils {
         return "";
     }
 
-    private static String getRandomPassword() {
-        String candidate = "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm123456789";
-        return RandomStringUtils.random(6, candidate);
-    }
 }
